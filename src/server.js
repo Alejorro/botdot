@@ -3,9 +3,7 @@ const express = require('express');
 const axios = require('axios');
 const cron = require('node-cron');
 const crypto = require('crypto');
-const { parseQuery } = require('./parser');
-const { filterProducts, fallbackProducts } = require('./filter');
-const { formatResults, formatNoResults, formatHelp } = require('./formatter');
+const { handleMessage } = require('./flow');
 const { syncWithLock, isSyncRunning } = require('./sync');
 const { getHealthStats } = require('./db');
 const { getConfig, validateStartupEnv } = require('./config');
@@ -57,47 +55,11 @@ app.post('/webhook', async (req, res) => {
   const chatId = payload.from;
   if (!chatId || !body) return;
 
-  if (!body.toLowerCase().startsWith(config.botTrigger)) return;
-
-  const queryText = body.slice(config.botTrigger.length).trim();
-  if (!queryText) {
-    try {
-      await sendMessage(chatId, formatHelp(config.botTrigger));
-    } catch (err) {
-      logSendError(err, chatId);
-    }
-    return;
-  }
-
-  const query = parseQuery(queryText);
-  const results = filterProducts(query);
-
-  if (results.length > 0) {
-    try {
-      await sendMessage(chatId, formatResults(results));
-    } catch (err) {
-      logSendError(err, chatId);
-    }
-    return;
-  }
-
-  const fallback = fallbackProducts(query);
-  if (fallback.length > 0) {
-    const msg = formatResults(
-      fallback,
-      'No encontré una opción exacta con esas características, pero tengo opciones similares:'
-    );
-    try {
-      await sendMessage(chatId, msg);
-    } catch (err) {
-      logSendError(err, chatId);
-    }
-  } else {
-    try {
-      await sendMessage(chatId, formatNoResults());
-    } catch (err) {
-      logSendError(err, chatId);
-    }
+  const response = handleMessage(chatId, body);
+  try {
+    await sendMessage(chatId, response);
+  } catch (err) {
+    logSendError(err, chatId);
   }
 });
 
@@ -105,7 +67,6 @@ app.get('/health', (_req, res) => {
   try {
     res.json({
       status: 'ok',
-      trigger: config.botTrigger,
       session: config.wahaSession,
       syncRunning: isSyncRunning(),
       ...getHealthStats(),
@@ -115,7 +76,6 @@ app.get('/health', (_req, res) => {
       status: 'error',
       dbAvailable: false,
       message: err.message,
-      trigger: config.botTrigger,
       session: config.wahaSession,
       syncRunning: isSyncRunning(),
     });
@@ -124,13 +84,12 @@ app.get('/health', (_req, res) => {
 
 function start() {
   validateStartupEnv();
-  // Sync every 2 hours.
   cron.schedule('0 */2 * * *', () => {
     syncWithLock().catch(err => console.error('[cron] Sync failed:', err.message));
   });
 
   app.listen(config.port, () => {
-    console.log(`BotDot running on port ${config.port} - trigger: "${config.botTrigger}"`);
+    console.log(`BotDot running on port ${config.port}`);
     syncWithLock().catch(err => console.error('[startup] Initial sync failed:', err.message));
   });
 }

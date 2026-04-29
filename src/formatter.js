@@ -36,17 +36,4 @@ function formatNoResults() {
   ].join('\n');
 }
 
-function formatHelp(trigger) {
-  return [
-    `Buscá notebooks disponibles escribiendo *${trigger}* seguido de lo que necesitás.`,
-    '',
-    'Ejemplos:',
-    `• ${trigger} laptop i5 16gb`,
-    `• ${trigger} lenovo ryzen 5 512gb`,
-    `• ${trigger} hp i7 16gb 1tb`,
-    '',
-    `👉 Asesor: ${ADVISOR_PHONE}`,
-  ].join('\n');
-}
-
-module.exports = { formatResults, formatNoResults, formatHelp };
+module.exports = { formatResults, formatNoResults };
