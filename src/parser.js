@@ -26,7 +26,7 @@ const CPU_TIER_MEMBERS = {
   3: ['i3', 'ryzen3'],
   5: ['i5', 'ryzen5', 'coreu5', 'core5'],
   7: ['i7', 'ryzen7', 'coreu7', 'core7'],
-  9: ['i9', 'ryzen9', 'coreu9'],
+  9: ['i9', 'ryzen9', 'coreu9', 'core9'],
 };
 
 const STORAGE_TIERS = [256, 512, 1000]; // 1TB stored as 1000
@@ -65,19 +65,18 @@ function parseCpu(text) {
 
 function parseRam(text) {
   const n = normalize(text);
-  const m = n.match(/\b(8|16|32|64)\s*gb\b/);
+  const m = n.match(/\b(4|8|12|16|24|32|64)\s*(?:gb|g\b|de\s+ram\b|ram\b)/);
   if (!m) return null;
-  // Avoid matching storage values: 256gb, 512gb caught by storage parser
   return parseInt(m[1]);
 }
 
 function parseStorage(text) {
   const n = normalize(text);
-  if (/\b1\s*tb\b/.test(n)) return 1000;
-  const m = n.match(/\b(128|256|512|1024)\s*gb\b/);
+  if (/\b1\s*(?:tb|tera|terabyte)\b/.test(n)) return 1000;
+  const m = n.match(/\b(128|256|512|1000|1024)\s*(?:gb|g\b|ssd\b|disco\b|almacenamiento\b)?/);
   if (!m) return null;
   const v = parseInt(m[1]);
-  return v === 1024 ? 1000 : v;
+  return v === 1000 || v === 1024 ? 1000 : v;
 }
 
 // Convert Odoo product.processor name to normalized cpu/tier

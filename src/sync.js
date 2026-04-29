@@ -1,12 +1,14 @@
 require('dotenv').config();
 const xmlrpc = require('xmlrpc');
-const { getDb } = require('./db');
+const { getDb, setMeta } = require('./db');
 const { parseProductName, parseBrand, normalizeCpuFromOdoo, parseRam, parseStorage } = require('./parser');
+const { getConfig } = require('./config');
 
 const PORTABLES_CATEG_ID = 141;
+let syncPromise = null;
 
 function rpcClient(path) {
-  const url = new URL(process.env.ODOO_URL);
+  const url = new URL(getConfig().odooUrl);
   const opts = {
     host: url.hostname,
     port: parseInt(url.port) || (url.protocol === 'https:' ? 443 : 80),
@@ -23,10 +25,16 @@ function call(client, method, params) {
   );
 }
 
+function markProductsStale(db, staleAt) {
+  db.prepare('UPDATE products SET is_active = 0, stale_at = ?').run(staleAt);
+}
+
+function hideStaleProducts(db) {
+  db.prepare('UPDATE products SET stock = 0 WHERE is_active = 0').run();
+}
+
 async function sync() {
-  const dbName = process.env.ODOO_DB;
-  const user = process.env.ODOO_USER;
-  const password = process.env.ODOO_PASSWORD;
+  const { odooDb: dbName, odooUser: user, odooPassword: password } = getConfig();
 
   console.log('[sync] Authenticating with Odoo...');
   const common = rpcClient('/xmlrpc/2/common');
@@ -51,16 +59,22 @@ async function sync() {
   );
 
   const db = getDb();
+  const syncStartedAt = new Date().toISOString();
   const upsert = db.prepare(`
-    INSERT INTO products (sku, name, clean_name, price, stock, brand, processor, proc_tier, ram_gb, storage_gb, last_updated)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO products (
+      sku, name, clean_name, price, stock, brand, processor, proc_tier,
+      ram_gb, storage_gb, last_updated, is_active, stale_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL)
     ON CONFLICT(sku) DO UPDATE SET
       name=excluded.name, clean_name=excluded.clean_name,
       price=excluded.price, stock=excluded.stock,
       brand=excluded.brand, processor=excluded.processor,
       proc_tier=excluded.proc_tier,
       ram_gb=excluded.ram_gb, storage_gb=excluded.storage_gb,
-      last_updated=excluded.last_updated
+      last_updated=excluded.last_updated,
+      is_active=1,
+      stale_at=NULL
   `);
 
   let synced = 0;
@@ -68,6 +82,8 @@ async function sync() {
 
   db.exec('BEGIN');
   try {
+    markProductsStale(db, syncStartedAt);
+
     for (const p of products) {
       if (!p.default_code) { skipped++; continue; }
 
@@ -103,16 +119,37 @@ async function sync() {
                  brand, processor, procTier, ramGb, storageGb, p.write_date);
       synced++;
     }
+    hideStaleProducts(db);
     db.exec('COMMIT');
+    setMeta('last_successful_sync', new Date().toISOString());
   } catch (err) {
     db.exec('ROLLBACK');
     throw err;
   }
 
-  console.log(`[sync] Done — ${synced} synced, ${skipped} skipped (no SKU)`);
+  console.log(`[sync] Done - ${synced} synced, ${skipped} skipped (no SKU)`);
 }
 
-module.exports = { sync };
+async function syncWithLock() {
+  if (syncPromise) {
+    console.warn('[sync] Sync already running; skipping overlapping request');
+    return { skipped: true };
+  }
+
+  syncPromise = sync()
+    .then(() => ({ skipped: false }))
+    .finally(() => {
+      syncPromise = null;
+    });
+
+  return syncPromise;
+}
+
+function isSyncRunning() {
+  return Boolean(syncPromise);
+}
+
+module.exports = { sync, syncWithLock, isSyncRunning, markProductsStale, hideStaleProducts };
 
 if (require.main === module) {
   sync().catch(err => { console.error('[sync] Error:', err.message); process.exit(1); });

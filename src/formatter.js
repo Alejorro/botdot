@@ -1,10 +1,13 @@
 require('dotenv').config();
 
-const ADVISOR_PHONE = process.env.ADVISOR_PHONE || '+54 9 11 5221-4436';
+const { getConfig } = require('./config');
+const ADVISOR_PHONE = getConfig().advisorPhone;
 
 function formatStock(stock) {
   const n = Math.floor(stock);
-  return n === 1 ? '1 unidad' : `${n} unidades`;
+  if (n <= 2) return 'Stock bajo';
+  if (n <= 10) return 'Disponible';
+  return '+10 disponibles';
 }
 
 function formatProductLine(product) {
