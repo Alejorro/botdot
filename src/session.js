@@ -13,18 +13,15 @@ function getSession(chatId) {
   return sessions.get(chatId) || null;
 }
 
-function setSession(chatId, step) {
-  // Reset timer on every interaction
+// step + optional extra data (lastQuery, lastOffset, etc.)
+function setSession(chatId, step, data = {}) {
   if (timers.has(chatId)) clearTimeout(timers.get(chatId));
-
-  sessions.set(chatId, { step });
-
+  sessions.set(chatId, { step, ...data });
   const timer = setTimeout(() => {
     sessions.delete(chatId);
     timers.delete(chatId);
     if (_onExpire) _onExpire(chatId);
   }, SESSION_TTL_MS);
-
   timers.set(chatId, timer);
 }
 
