@@ -4,6 +4,7 @@ const axios = require('axios');
 const cron = require('node-cron');
 const crypto = require('crypto');
 const { handleMessage } = require('./flow');
+const { onExpire } = require('./session');
 const { syncWithLock, isSyncRunning } = require('./sync');
 const { getHealthStats } = require('./db');
 const { getConfig, validateStartupEnv } = require('./config');
@@ -82,8 +83,22 @@ app.get('/health', (_req, res) => {
   }
 });
 
+const GOODBYE = [
+  'Esta conversación ha finalizado por inactividad.',
+  'Si necesitás algo más, escribinos cuando quieras. 👋',
+].join('\n');
+
 function start() {
   validateStartupEnv();
+
+  onExpire(async (chatId) => {
+    try {
+      await sendMessage(chatId, GOODBYE);
+    } catch (err) {
+      logSendError(err, chatId);
+    }
+  });
+
   cron.schedule('0 */2 * * *', () => {
     syncWithLock().catch(err => console.error('[cron] Sync failed:', err.message));
   });
