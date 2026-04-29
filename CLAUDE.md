@@ -2,6 +2,39 @@
 
 BotDot answers WhatsApp messages about laptop availability. It reads from a local SQLite cache that is synced from Odoo, so customer messages do not query Odoo directly.
 
+## Deploy Status
+
+### BotDot — ✅ funcionando
+- URL: `https://botdot-production-8fb0.up.railway.app`
+- Health OK: 237 productos, 50 en stock, sync corriendo cada 2h
+- Todas las variables configuradas en Railway
+
+### WAHA para BotDot — ⚠️ pendiente de configurar
+- URL: `https://waha-production-39db.up.railway.app`
+- Variables actuales en Railway:
+  - `WAHA_DASHBOARD_USERNAME=admin`
+  - `WAHA_DASHBOARD_PASSWORD=admin`
+  - `WHATSAPP_DEFAULT_ENGINE=WEBJS`
+  - `WHATSAPP_HOOK_URL=https://botdot-production-8fb0.up.railway.app/webhook`
+  - `WHATSAPP_HOOK_EVENTS=message`
+  - `WHATSAPP_HOOK_CUSTOM_HEADERS=x-webhook-secret:dot4bot2024secreto`
+  - `WAHA_API_KEY=admin`
+- **Pendiente:** agregar `WHATSAPP_API_KEY=admin` (falta esta variable)
+- **Pendiente:** el login al dashboard no funcionó — probar con `admin`/`admin` después del redeploy
+- **Pendiente:** corregir en BotDot `WAHA_URL` → agregar `https://` adelante
+
+### Próximos pasos para activar el bot
+1. En WAHA (`waha-production-39db`) → agregar variable `WHATSAPP_API_KEY=admin` → redeploy
+2. En BotDot → corregir `WAHA_URL=https://waha-production-39db.up.railway.app` → redeploy
+3. Entrar al dashboard WAHA con `admin` / `admin`
+4. Crear sesión → escanear QR con el número nuevo (SIM prepago)
+5. Mandar `Hola` desde WhatsApp y verificar que responde
+
+### WAHA del otro bot (NO tocar)
+- URL: `https://waha-production-8cff.up.railway.app`
+- Sesión: `default` — número Ayudame Loco Ayudame (549115221...)
+- API key: `gasta22`
+
 ## Current Status
 
 Implemented and verified locally:
