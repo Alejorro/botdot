@@ -54,7 +54,7 @@ function sortProducts(scored) {
   });
 }
 
-function filterProducts(query, offset = 0) {
+function filterProducts(query) {
   const db = getDb();
   let products = [...db.prepare('SELECT * FROM products WHERE stock > 0 AND is_active = 1').all()];
 
@@ -70,7 +70,7 @@ function filterProducts(query, offset = 0) {
     : products;
   const scored = exactProducts.map(p => ({ ...p, _score: scoreProduct(p, query) }));
 
-  return sortProducts(scored).slice(offset, offset + 5);
+  return sortProducts(scored).slice(0, 5);
 }
 
 function fallbackProducts(query) {
